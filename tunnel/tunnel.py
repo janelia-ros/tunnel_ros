@@ -42,12 +42,12 @@ from time import time
 import math
 
 class Joint:
-    ACCELERATION = 10000
-    VELOCITY_LIMIT = 10000
+    ACCELERATION = 100000
+    VELOCITY_LIMIT = 20000
     HOME_VELOCITY_LIMIT = 1000
     HOME_TARGET_POSITION = -10000
-    CURRENT_LIMIT = 0.140
-    HOLDING_CURRENT_LIMIT = 0
+    CURRENT_LIMIT = 0.3
+    HOLDING_CURRENT_LIMIT = 0.5
     ATTACHMENT_TIMEOUT = 5000
 
     def __init__(self, stepper_channel_info, home_switch_channel_info, name):
@@ -156,6 +156,12 @@ class Joint:
         self._stepper.close()
         self._home_switch.close()
 
+    def get_rescale_factor(self):
+        return self._stepper.getRescaleFactor()
+
+    def set_rescale_factor(self, rescale_factor):
+        return self._stepper.setRescaleFactor(rescale_factor)
+
     def get_position(self):
         return self._stepper.getPosition()
 
@@ -175,12 +181,10 @@ class Joint:
         self._stepper.setVelocityLimit(velocity_limit)
 
 class Tunnel(Node):
-    X_JOINT_STEPPER_HUB_PORT = 0
-    Y_JOINT_STEPPER_HUB_PORT = 1
-    Z_JOINT_STEPPER_HUB_PORT = 2
-    X_JOINT_HOME_SWITCH_HUB_PORT = 5
-    Y_JOINT_HOME_SWITCH_HUB_PORT = 4
-    Z_JOINT_HOME_SWITCH_HUB_PORT = 3
+    RIGHT_JOINT_STEPPER_HUB_PORT = 0
+    LEFT_JOINT_STEPPER_HUB_PORT = 5
+    RIGHT_JOINT_HOME_SWITCH_HUB_PORT = 1
+    LEFT_JOINT_HOME_SWITCH_HUB_PORT = 4
 
     def __init__(self):
         super().__init__('tunnel')
@@ -210,31 +214,23 @@ class Tunnel(Node):
             home_switch_channel_info.isVINT = True
             home_switch_channel_info.netInfo.isRemote = False
 
-            stepper_channel_info.hubPort = self.X_JOINT_STEPPER_HUB_PORT
-            home_switch_channel_info.hubPort = self.X_JOINT_HOME_SWITCH_HUB_PORT
-            name = 'x'
+            stepper_channel_info.hubPort = self.RIGHT_JOINT_STEPPER_HUB_PORT
+            home_switch_channel_info.hubPort = self.RIGHT_JOINT_HOME_SWITCH_HUB_PORT
+            name = 'right'
             self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
             self._joints[name].set_logger(self.get_logger())
             self._joints[name].set_publish_joint_state(self._publish_joint_state)
 
-            stepper_channel_info.hubPort = self.Y_JOINT_STEPPER_HUB_PORT
-            home_switch_channel_info.hubPort = self.Y_JOINT_HOME_SWITCH_HUB_PORT
-            name = 'y'
-            self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
-            self._joints[name].set_logger(self.get_logger())
-            self._joints[name].set_publish_joint_state(self._publish_joint_state)
-
-            stepper_channel_info.hubPort = self.Z_JOINT_STEPPER_HUB_PORT
-            home_switch_channel_info.hubPort = self.Z_JOINT_HOME_SWITCH_HUB_PORT
-            name = 'z'
+            stepper_channel_info.hubPort = self.LEFT_JOINT_STEPPER_HUB_PORT
+            home_switch_channel_info.hubPort = self.LEFT_JOINT_HOME_SWITCH_HUB_PORT
+            name = 'left'
             self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
             self._joints[name].set_logger(self.get_logger())
             self._joints[name].set_publish_joint_state(self._publish_joint_state)
 
             try:
-                self._joints['x'].open_wait_for_attachment()
-                self._joints['y'].open_wait_for_attachment()
-                self._joints['z'].open_wait_for_attachment()
+                for name, joint in self._joints.items():
+                    joint.open_wait_for_attachment()
             except PhidgetException as e:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
