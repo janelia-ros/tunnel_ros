@@ -21,5 +21,5 @@ Command Line Examples
 ```bash
 ros2 run tunnel tunnel
 ros2 topic echo /tunnel_joint_state
-ros2 topic pub -1 /tunnel_joint_target sensor_msgs/JointState "{name: [x,y,z], position: [1000,1000,1000]}"
+ros2 topic pub -1 /tunnel_joint_target sensor_msgs/JointState "{name: [right,left], position: [1000,1000]}"
 ```

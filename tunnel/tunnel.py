@@ -157,10 +157,16 @@ class Joint:
         self._home_switch.close()
 
     def get_rescale_factor(self):
-        return self._stepper.getRescaleFactor()
+            try:
+                rescale_factor = self._stepper.getRescaleFactor()
+                self._logger.info('rescale_factor: {0}'.format(rescale_factor))
+            except PhidgetException as e:
+                DisplayError(e)
+                return
+        # return self._stepper.getRescaleFactor()
 
     def set_rescale_factor(self, rescale_factor):
-        return self._stepper.setRescaleFactor(rescale_factor)
+        self._stepper.setRescaleFactor(rescale_factor)
 
     def get_position(self):
         return self._stepper.getPosition()
@@ -181,10 +187,18 @@ class Joint:
         self._stepper.setVelocityLimit(velocity_limit)
 
 class Tunnel(Node):
-    RIGHT_JOINT_STEPPER_HUB_PORT = 0
-    LEFT_JOINT_STEPPER_HUB_PORT = 5
-    RIGHT_JOINT_HOME_SWITCH_HUB_PORT = 1
-    LEFT_JOINT_HOME_SWITCH_HUB_PORT = 4
+    _JOINT_PARAMETERS ={
+        'right': {
+            'stepper_hub_port': 0,
+            'switch_hub_port': 1,
+            'rescale_factor': 1.0,
+        },
+        'left': {
+            'stepper_hub_port': 5,
+            'switch_hub_port': 4,
+            'rescale_factor': 1.0,
+        },
+    }
 
     def __init__(self):
         super().__init__('tunnel')
@@ -214,23 +228,16 @@ class Tunnel(Node):
             home_switch_channel_info.isVINT = True
             home_switch_channel_info.netInfo.isRemote = False
 
-            stepper_channel_info.hubPort = self.RIGHT_JOINT_STEPPER_HUB_PORT
-            home_switch_channel_info.hubPort = self.RIGHT_JOINT_HOME_SWITCH_HUB_PORT
-            name = 'right'
-            self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
-            self._joints[name].set_logger(self.get_logger())
-            self._joints[name].set_publish_joint_state(self._publish_joint_state)
-
-            stepper_channel_info.hubPort = self.LEFT_JOINT_STEPPER_HUB_PORT
-            home_switch_channel_info.hubPort = self.LEFT_JOINT_HOME_SWITCH_HUB_PORT
-            name = 'left'
-            self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
-            self._joints[name].set_logger(self.get_logger())
-            self._joints[name].set_publish_joint_state(self._publish_joint_state)
-
             try:
-                for name, joint in self._joints.items():
+                for name, parameters in self._JOINT_PARAMETERS.items():
+                    stepper_channel_info.hubPort = parameters['stepper_hub_port']
+                    home_switch_channel_info.hubPort = parameters['switch_hub_port']
+                    self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
+                    joint = self._joints[name]
+                    joint.set_logger(self.get_logger())
+                    joint.set_publish_joint_state(self._publish_joint_state)
                     joint.open_wait_for_attachment()
+                    joint.set_rescale_factor(parameters['rescale_factor'])
             except PhidgetException as e:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
