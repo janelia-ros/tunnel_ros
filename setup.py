@@ -29,8 +29,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'tunnel ='
-            ' tunnel.tunnel:main',
+            'tunnel_node ='
+            ' tunnel.tunnel_node:main',
         ],
     },
 )
