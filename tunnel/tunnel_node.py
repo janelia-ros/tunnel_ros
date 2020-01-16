@@ -33,8 +33,6 @@ from sensor_msgs.msg import JointState
 
 from Phidget22.Phidget import *
 from Phidget22.PhidgetException import *
-from Phidget22.Devices.Stepper import *
-from Phidget22.Devices.DigitalInput import *
 
 from phidgets_python_interface.PhidgetHelperFunctions import *
 from phidgets_python_interface.joint import Joint
@@ -47,12 +45,30 @@ class Tunnel(Node):
         'right': {
             'stepper_hub_port': 0,
             'switch_hub_port': 1,
+            'attachment_timeout': 5000,
+            'data_interval': 100,
+            'acceleration': 100000,
+            'velocity_limit': 20000,
+            'home_velocity_limit': 1000,
+            'home_target_position': -10000,
+            'current_limit': 0.3,
+            'holding_current_limit': 0.5,
             'rescale_factor': 1.0,
+            'invert_direction': True,
         },
         'left': {
             'stepper_hub_port': 5,
             'switch_hub_port': 4,
+            'attachment_timeout': 5000,
+            'data_interval': 100,
+            'acceleration': 100000,
+            'velocity_limit': 20000,
+            'home_velocity_limit': 1000,
+            'home_target_position': -10000,
+            'current_limit': 0.3,
+            'holding_current_limit': 0.5,
             'rescale_factor': 1.0,
+            'invert_direction': False,
         },
     }
 
@@ -62,7 +78,7 @@ class Tunnel(Node):
         self._joint_target_subscription = self.create_subscription(
             JointState,
             'tunnel_joint_target',
-            self.joint_target_callback,
+            self._joint_target_callback,
             10)
         self._joint_target_subscription  # prevent unused variable warning
         self._joints = {}
@@ -70,30 +86,9 @@ class Tunnel(Node):
 
     def _setup_joints(self):
         try:
-            stepper_channel_info = ChannelInfo()
-            stepper_channel_info.deviceSerialNumber = Phidget.ANY_SERIAL_NUMBER
-            stepper_channel_info.isHubPortDevice = False
-            stepper_channel_info.channel = 0
-            stepper_channel_info.isVint = True
-            stepper_channel_info.netInfo.isRemote = False
-
-            home_switch_channel_info = ChannelInfo()
-            home_switch_channel_info.deviceSerialNumber = Phidget.ANY_SERIAL_NUMBER
-            home_switch_channel_info.isHubPortDevice = True
-            home_switch_channel_info.channel = 0
-            home_switch_channel_info.isVINT = True
-            home_switch_channel_info.netInfo.isRemote = False
-
             try:
                 for name, parameters in self._JOINT_PARAMETERS.items():
-                    stepper_channel_info.hubPort = parameters['stepper_hub_port']
-                    home_switch_channel_info.hubPort = parameters['switch_hub_port']
-                    self._joints[name] = Joint(stepper_channel_info, home_switch_channel_info, name)
-                    joint = self._joints[name]
-                    joint.set_logger(self.get_logger())
-                    joint.set_publish_joint_state(self._publish_joint_state)
-                    joint.open_wait_for_attachment()
-                    joint.set_rescale_factor(parameters['rescale_factor'])
+                    self._joints[name] = Joint(name, parameters, self.get_logger(), self._publish_joint_state)
             except:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
@@ -104,21 +99,13 @@ class Tunnel(Node):
                 joint.close()
             return 1
         except EndProgramSignal as e:
-            self.get_logger().info(e)
+            self.get_logger().info(str(e))
             for name, joint in self._joints.items():
                 joint.close()
-            return 1
+            raise EndProgramSignal(str(e))
 
-        def home_all():
-            for name, joint in self._joints.items():
-                joint.home()
-
-        home_all()
-
-    def disable_all_joints(self):
         for name, joint in self._joints.items():
-            joint.disable()
-
+            joint.home()
 
     def _publish_joint_state(self, ch, position):
         joint_state = JointState()
@@ -132,7 +119,7 @@ class Tunnel(Node):
             joint_state.velocity.append(joint.get_velocity())
         self._joint_state_publisher.publish(joint_state)
 
-    def joint_target_callback(self, msg):
+    def _joint_target_callback(self, msg):
         if len(msg.name) == len(msg.velocity) == len(msg.position):
             targets = zip(msg.name, msg.velocity, msg.position)
             for name, velocity, position in targets:
@@ -148,6 +135,11 @@ class Tunnel(Node):
                     self._joints[name].set_target_position(position)
                 except KeyError:
                     pass
+
+    def disable_all_joints(self):
+        for name, joint in self._joints.items():
+            joint.disable()
+
 
 def main(args=None):
     rclpy.init(args=args)
