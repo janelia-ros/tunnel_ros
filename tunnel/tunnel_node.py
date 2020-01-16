@@ -31,10 +31,6 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 
-from Phidget22.Phidget import *
-from Phidget22.PhidgetException import *
-
-from phidgets_python_interface.PhidgetHelperFunctions import *
 from phidgets_python_interface.joint import Joint
 
 from time import time
