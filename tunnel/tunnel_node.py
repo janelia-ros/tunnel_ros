@@ -31,14 +31,38 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 
+from Phidget22.PhidgetException import *
+from phidgets_python_api.phidget import EndProgramSignal
 from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
 
 from time import time
 import math
 
+class TunnelInfo():
+    def __init__(self):
+        self.joints_info = {'right': StepperJointInfo(), 'left': StepperJointInfo()}
+        right = self.joints_info['right']
+        right.stepper_info.phidget_info.hub_port = 0
+        right.home_switch_info.phidget_info.hub_port = 1
+        right.stepper_info.acceleration = 100000
+        right.stepper_info.velocity_limit = 20000
+        right.stepper_info.current_limit = 0.3
+        right.stepper_info.holding_current_limit = 0.5
+        right.stepper_info.invert_direction = True
+        left = self.joints_info['left']
+        left.stepper_info.phidget_info.hub_port = 5
+        left.home_switch_info.phidget_info.hub_port = 4
+        left.stepper_info.acceleration = 100000
+        left.stepper_info.velocity_limit = 20000
+        left.stepper_info.current_limit = 0.3
+        left.stepper_info.holding_current_limit = 0.5
+        left.stepper_info.invert_direction = False
+
 class Tunnel(Node):
     def __init__(self):
         super().__init__('tunnel')
+        self._tunnel_info = TunnelInfo()
+
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
         self._joint_target_subscription = self.create_subscription(
             JointState,
@@ -47,32 +71,14 @@ class Tunnel(Node):
             10)
         self._joint_target_subscription  # prevent unused variable warning
 
-        self._joints_info = {'right': StepperJointInfo(), 'left': StepperJointInfo()}
-        right = self._joints_info['right']
-        right.stepper_info.channel_info.hub_port = 0
-        right.home_switch_info.channel_info.hub_port = 1
-        right.stepper_info.acceleration = 100000
-        right.stepper_info.velocity_limit = 20000
-        right.stepper_info.current_limit = 0.3
-        right.stepper_info.holding_current_limit = 0.5
-        right.stepper.invert_direction = True
-        left = self._joints_info['left']
-        left.stepper_info.channel_info.hub_port = 5
-        left.home_switch_info.channel_info.hub_port = 4
-        left.stepper_info.acceleration = 100000
-        left.stepper_info.velocity_limit = 20000
-        left.stepper_info.current_limit = 0.3
-        left.stepper_info.holding_current_limit = 0.5
-        left.stepper.invert_direction = False
-
         self._joints = {}
         self._setup_joints()
 
     def _setup_joints(self):
         try:
             try:
-                for name, info in self.self._joints_info.items():
-                    self._joints[name] = Joint(info)
+                for name, info in self._tunnel_info.joints_info.items():
+                    self._joints[name] = StepperJoint(info)
             except:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
@@ -91,7 +97,14 @@ class Tunnel(Node):
         for name, joint in self._joints.items():
             joint.home()
 
-    def _publish_joint_state(self, ch, position):
+        for name, joint in self._joints.items():
+            joint.stepper.set_target_position(100)
+
+        for name, joint in self._joints.items():
+            joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+            joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+
+    def _publish_joint_state(self, handle, value):
         joint_state = JointState()
         joint_state.header = Header()
         now_frac, now_whole = math.modf(time())
