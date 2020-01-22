@@ -1,4 +1,4 @@
-# Copyright (c) 2019, Howard Hughes Medical Institute
+# Copyright (c) 2020, Howard Hughes Medical Institute
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,43 +31,12 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 
-from phidgets_python_interface.joint import Joint
+from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
 
 from time import time
 import math
 
 class Tunnel(Node):
-    _JOINT_PARAMETERS ={
-        'right': {
-            'stepper_hub_port': 0,
-            'switch_hub_port': 1,
-            'attachment_timeout': 5000,
-            'data_interval': 100,
-            'acceleration': 100000,
-            'velocity_limit': 20000,
-            'home_velocity_limit': 1000,
-            'home_target_position': -10000,
-            'current_limit': 0.3,
-            'holding_current_limit': 0.5,
-            'rescale_factor': 1.0,
-            'invert_direction': True,
-        },
-        'left': {
-            'stepper_hub_port': 5,
-            'switch_hub_port': 4,
-            'attachment_timeout': 5000,
-            'data_interval': 100,
-            'acceleration': 100000,
-            'velocity_limit': 20000,
-            'home_velocity_limit': 1000,
-            'home_target_position': -10000,
-            'current_limit': 0.3,
-            'holding_current_limit': 0.5,
-            'rescale_factor': 1.0,
-            'invert_direction': False,
-        },
-    }
-
     def __init__(self):
         super().__init__('tunnel')
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
@@ -77,14 +46,33 @@ class Tunnel(Node):
             self._joint_target_callback,
             10)
         self._joint_target_subscription  # prevent unused variable warning
+
+        self._joints_info = {'right': StepperJointInfo(), 'left': StepperJointInfo()}
+        right = self._joints_info['right']
+        right.stepper_info.channel_info.hub_port = 0
+        right.home_switch_info.channel_info.hub_port = 1
+        right.stepper_info.acceleration = 100000
+        right.stepper_info.velocity_limit = 20000
+        right.stepper_info.current_limit = 0.3
+        right.stepper_info.holding_current_limit = 0.5
+        right.stepper.invert_direction = True
+        left = self._joints_info['left']
+        left.stepper_info.channel_info.hub_port = 5
+        left.home_switch_info.channel_info.hub_port = 4
+        left.stepper_info.acceleration = 100000
+        left.stepper_info.velocity_limit = 20000
+        left.stepper_info.current_limit = 0.3
+        left.stepper_info.holding_current_limit = 0.5
+        left.stepper.invert_direction = False
+
         self._joints = {}
         self._setup_joints()
 
     def _setup_joints(self):
         try:
             try:
-                for name, parameters in self._JOINT_PARAMETERS.items():
-                    self._joints[name] = Joint(name, parameters, self.get_logger(), self._publish_joint_state)
+                for name, info in self.self._joints_info.items():
+                    self._joints[name] = Joint(info)
             except:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
@@ -111,8 +99,8 @@ class Tunnel(Node):
         joint_state.header.stamp.nanosec = int(now_frac * 1e9)
         for name, joint in self._joints.items():
             joint_state.name.append(name)
-            joint_state.position.append(joint.get_position())
-            joint_state.velocity.append(joint.get_velocity())
+            joint_state.position.append(joint.stepper.get_position())
+            joint_state.velocity.append(joint.stepper.get_velocity())
         self._joint_state_publisher.publish(joint_state)
 
     def _joint_target_callback(self, msg):
@@ -120,21 +108,21 @@ class Tunnel(Node):
             targets = zip(msg.name, msg.velocity, msg.position)
             for name, velocity, position in targets:
                 try:
-                    self._joints[name].set_velocity_limit(velocity)
-                    self._joints[name].set_target_position(position)
+                    self._joints[name].stepper.set_velocity_limit(velocity)
+                    self._joints[name].stepper.set_target_position(position)
                 except KeyError:
                     pass
         elif len(msg.name) == len(msg.position):
             targets = zip(msg.name, msg.position)
             for name, position in targets:
                 try:
-                    self._joints[name].set_target_position(position)
+                    self._joints[name].stepper.set_target_position(position)
                 except KeyError:
                     pass
 
     def disable_all_joints(self):
         for name, joint in self._joints.items():
-            joint.disable()
+            joint.stepper.disable()
 
 
 def main(args=None):
