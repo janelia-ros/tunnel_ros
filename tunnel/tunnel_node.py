@@ -57,11 +57,13 @@ class TunnelInfo():
         left.stepper_info.current_limit = 0.3
         left.stepper_info.holding_current_limit = 0.5
         left.stepper_info.invert_direction = False
+        self.latch_position = 1000
 
 class Tunnel(Node):
     def __init__(self):
         super().__init__('tunnel')
         self._tunnel_info = TunnelInfo()
+        self.name = 'tunnel'
 
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
         self._joint_target_subscription = self.create_subscription(
@@ -78,7 +80,7 @@ class Tunnel(Node):
         try:
             try:
                 for name, info in self._tunnel_info.joints_info.items():
-                    self._joints[name] = StepperJoint(info)
+                    self._joints[name] = StepperJoint(info, self.name + "_" + name, self.get_logger())
             except:
                 raise EndProgramSignal('Program Terminated: Open Failed')
 
@@ -97,12 +99,19 @@ class Tunnel(Node):
         for name, joint in self._joints.items():
             joint.home()
 
-        for name, joint in self._joints.items():
-            joint.stepper.set_target_position(100)
+        all_homed = False
+        while not all_homed:
+            all_homed = True
+            for name, joint in self._joints.items():
+                if not joint.homed:
+                    all_homed = False
 
         for name, joint in self._joints.items():
             joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
             joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+
+        for name, joint in self._joints.items():
+            joint.stepper.set_target_position(self._tunnel_info.latch_position)
 
     def _publish_joint_state(self, handle, value):
         joint_state = JointState()
