@@ -31,124 +31,106 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 
-from Phidget22.PhidgetException import *
-from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
+from .tunnel import Tunnel, TunnelInfo
 
 from time import time
 import math
 
-class TunnelInfo():
-    def __init__(self):
-        self.joints_info = {'right': StepperJointInfo(), 'left': StepperJointInfo()}
-
-        right = self.joints_info['right']
-        right.stepper_info.phidget_info.hub_port = 0
-        right.home_switch_info.phidget_info.hub_port = 1
-        right.stepper_info.acceleration = 100000
-        right.stepper_info.velocity_limit = 20000
-        right.stepper_info.current_limit = 0.3
-        right.stepper_info.holding_current_limit = 0.5
-        right.stepper_info.invert_direction = True
-
-        left = self.joints_info['left']
-        left.stepper_info.phidget_info.hub_port = 5
-        left.home_switch_info.phidget_info.hub_port = 4
-        left.stepper_info.acceleration = 100000
-        left.stepper_info.velocity_limit = 20000
-        left.stepper_info.current_limit = 0.3
-        left.stepper_info.holding_current_limit = 0.5
-        left.stepper_info.invert_direction = False
-
-        self.latch_position = 1000
-
-class Tunnel(Node):
+class TunnelNode(Node):
     def __init__(self):
         super().__init__('tunnel')
-        self._tunnel_info = TunnelInfo()
+
+        self.tunnel_info = TunnelInfo()
         self.name = 'tunnel'
+        self.logger = self.get_logger()
+        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
 
-        self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
-        self._joint_target_subscription = self.create_subscription(
-            JointState,
-            'tunnel_joint_target',
-            self._joint_target_callback,
-            10)
-        self._joint_target_subscription  # prevent unused variable warning
+        # self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
+        # self._joint_target_subscription = self.create_subscription(
+        #     JointState,
+        #     'tunnel_joint_target',
+        #     self._joint_target_callback,
+        #     10)
+        # self._joint_target_subscription  # prevent unused variable warning
 
-        self._joints = {}
-        self._setup_joints()
+        self._setup_tunnel()
 
-    def _setup_joints(self):
-        try:
-            for name, info in self._tunnel_info.joints_info.items():
-                self._joints[name] = StepperJoint(info, self.name + "_" + name, self.get_logger())
 
-        except PhidgetException as e:
-            self.get_logger().error(str(e))
-            for name, joint in self._joints.items():
-                joint.close()
-            raise e
+    def _setup_tunnel(self):
+        self.tunnel.home_latches()
 
-        for name, joint in self._joints.items():
-            joint.home()
+        while not self.tunnel.all_latches_homed():
+            pass
 
-        all_homed = False
-        while not all_homed:
-            all_homed = True
-            for name, joint in self._joints.items():
-                if not joint.homed:
-                    all_homed = False
+        self.tunnel.latch()
 
-        for name, joint in self._joints.items():
-            joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
-            joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+        # for name, latch in self.tunnel.latches.items():
+        #     latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
+        #     latch.stepper_joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
 
-        for name, joint in self._joints.items():
-            joint.stepper.set_target_position(self._tunnel_info.latch_position)
+    # def latch(self):
+    #     for name, joint in self.joints.items():
+    #         joint.stepper.set_target_position(self.tunnel_info.latch_position)
 
-    def _publish_joint_state(self, handle, value):
-        joint_state = JointState()
-        joint_state.header = Header()
-        now_frac, now_whole = math.modf(time())
-        joint_state.header.stamp.sec = int(now_whole)
-        joint_state.header.stamp.nanosec = int(now_frac * 1e9)
-        for name, joint in self._joints.items():
-            joint_state.name.append(name)
-            joint_state.position.append(joint.stepper.get_position())
-            joint_state.velocity.append(joint.stepper.get_velocity())
-        self._joint_state_publisher.publish(joint_state)
+    # def _find_latch_positions(self):
+    #     for name, latch_switch in self.latch_switches.items():
+    #         if not latch_switch.is_active():
+    #             latch_switch.set_on_state_change_handler(self._find_latch_position_handler)
+    #             stepper = self.joints[name].stepper
+    #             stepper.set_velocity_limit(1000)
+    #             stepper.set_target_position(10000)
 
-    def _joint_target_callback(self, msg):
-        if len(msg.name) == len(msg.velocity) == len(msg.position):
-            targets = zip(msg.name, msg.velocity, msg.position)
-            for name, velocity, position in targets:
-                try:
-                    self._joints[name].stepper.set_velocity_limit(velocity)
-                    self._joints[name].stepper.set_target_position(position)
-                except KeyError:
-                    pass
-        elif len(msg.name) == len(msg.position):
-            targets = zip(msg.name, msg.position)
-            for name, position in targets:
-                try:
-                    self._joints[name].stepper.set_target_position(position)
-                except KeyError:
-                    pass
+    # def _find_latch_position_handler(self, handle, state):
+    #     for name, latch_switch in self.latch_switches.items():
+    #         if latch_switch.is_handle(handle):
+    #             if latch_switch.is_active():
+    #                 latch_position = self.joints[name].stepper.get_position()
+    #                 msg = '{0 latch position is {1}'.format(latch_switch.name, latch_position)
+    #                 self.logger.info(msg)
+    #                 latch_switch.set_on_state_change_handler(None)
 
-    def disable_all_joints(self):
-        for name, joint in self._joints.items():
-            joint.stepper.disable()
+    # def disable_all_joints(self):
+    #     for name, joint in self.joints.items():
+    #         joint.stepper.disable()
+
+    # def _publish_joint_state(self, handle, value):
+    #     joint_state = JointState()
+    #     joint_state.header = Header()
+    #     now_frac, now_whole = math.modf(time())
+    #     joint_state.header.stamp.sec = int(now_whole)
+    #     joint_state.header.stamp.nanosec = int(now_frac * 1e9)
+    #     for name, joint in self.joints.items():
+    #         joint_state.name.append(name)
+    #         joint_state.position.append(joint.stepper.get_position())
+    #         joint_state.velocity.append(joint.stepper.get_velocity())
+    #     self._joint_state_publisher.publish(joint_state)
+
+    # def _joint_target_callback(self, msg):
+    #     if len(msg.name) == len(msg.velocity) == len(msg.position):
+    #         targets = zip(msg.name, msg.velocity, msg.position)
+    #         for name, velocity, position in targets:
+    #             try:
+    #                 self.joints[name].stepper.set_velocity_limit(velocity)
+    #                 self.joints[name].stepper.set_target_position(position)
+    #             except KeyError:
+    #                 pass
+    #     elif len(msg.name) == len(msg.position):
+    #         targets = zip(msg.name, msg.position)
+    #         for name, position in targets:
+    #             try:
+    #                 self.joints[name].stepper.set_target_position(position)
+    #             except KeyError:
+    #                 pass
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    tunnel = Tunnel()
+    tunnel_node = TunnelNode()
 
-    rclpy.spin(tunnel)
+    rclpy.spin(tunnel_node)
 
-    tunnel.disable_all_joints()
-    tunnel.destroy_node()
+    tunnel_node.destroy_node()
     rclpy.shutdown()
 
 
