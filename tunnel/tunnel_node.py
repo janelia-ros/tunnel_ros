@@ -32,7 +32,6 @@ from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 
 from Phidget22.PhidgetException import *
-from phidgets_python_api.phidget import EndProgramSignal
 from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
 
 from time import time
@@ -41,6 +40,7 @@ import math
 class TunnelInfo():
     def __init__(self):
         self.joints_info = {'right': StepperJointInfo(), 'left': StepperJointInfo()}
+
         right = self.joints_info['right']
         right.stepper_info.phidget_info.hub_port = 0
         right.home_switch_info.phidget_info.hub_port = 1
@@ -49,6 +49,7 @@ class TunnelInfo():
         right.stepper_info.current_limit = 0.3
         right.stepper_info.holding_current_limit = 0.5
         right.stepper_info.invert_direction = True
+
         left = self.joints_info['left']
         left.stepper_info.phidget_info.hub_port = 5
         left.home_switch_info.phidget_info.hub_port = 4
@@ -57,6 +58,7 @@ class TunnelInfo():
         left.stepper_info.current_limit = 0.3
         left.stepper_info.holding_current_limit = 0.5
         left.stepper_info.invert_direction = False
+
         self.latch_position = 1000
 
 class Tunnel(Node):
@@ -78,23 +80,14 @@ class Tunnel(Node):
 
     def _setup_joints(self):
         try:
-            try:
-                for name, info in self._tunnel_info.joints_info.items():
-                    self._joints[name] = StepperJoint(info, self.name + "_" + name, self.get_logger())
-            except:
-                raise EndProgramSignal('Program Terminated: Open Failed')
+            for name, info in self._tunnel_info.joints_info.items():
+                self._joints[name] = StepperJoint(info, self.name + "_" + name, self.get_logger())
 
         except PhidgetException as e:
-            DisplayError(e)
-            traceback.print_exc()
+            self.get_logger().error(str(e))
             for name, joint in self._joints.items():
                 joint.close()
-            return 1
-        except EndProgramSignal as e:
-            self.get_logger().info(str(e))
-            for name, joint in self._joints.items():
-                joint.close()
-            raise EndProgramSignal(str(e))
+            raise e
 
         for name, joint in self._joints.items():
             joint.home()
