@@ -45,6 +45,10 @@ class TunnelNode(Node):
         self.logger = self.get_logger()
         self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
 
+        self._setup_tunnel_node()
+
+    def _setup_tunnel_node(self):
+        pass
         # self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
         # self._joint_target_subscription = self.create_subscription(
         #     JointState,
@@ -52,17 +56,6 @@ class TunnelNode(Node):
         #     self._joint_target_callback,
         #     10)
         # self._joint_target_subscription  # prevent unused variable warning
-
-        self._setup_tunnel()
-
-
-    def _setup_tunnel(self):
-        self.tunnel.home_latches()
-
-        while not self.tunnel.all_latches_homed():
-            pass
-
-        self.tunnel.latch()
 
         # for name, latch in self.tunnel.latches.items():
         #     latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
