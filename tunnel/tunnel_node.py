@@ -43,13 +43,18 @@ class TunnelNode(Node):
         self.tunnel_info = TunnelInfo()
         self.name = 'tunnel'
         self.logger = self.get_logger()
-        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
 
         self._setup_tunnel_node()
 
     def _setup_tunnel_node(self):
-        pass
-        # self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
+        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
+
+        self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
+
+        for name, latch in self.tunnel.latches.items():
+            latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
+            latch.stepper_joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+
         # self._joint_target_subscription = self.create_subscription(
         #     JointState,
         #     'tunnel_joint_target',
@@ -57,9 +62,17 @@ class TunnelNode(Node):
         #     10)
         # self._joint_target_subscription  # prevent unused variable warning
 
-        # for name, latch in self.tunnel.latches.items():
-        #     latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
-        #     latch.stepper_joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
+    def _publish_joint_state(self, handle, value):
+        joint_state = JointState()
+        joint_state.header = Header()
+        now_frac, now_whole = math.modf(time())
+        joint_state.header.stamp.sec = int(now_whole)
+        joint_state.header.stamp.nanosec = int(now_frac * 1e9)
+        for name, latch in self.tunnel.latches.items():
+            joint_state.name.append(name)
+            joint_state.position.append(latch.stepper_joint.stepper.get_position())
+            joint_state.velocity.append(latch.stepper_joint.stepper.get_velocity())
+        self._joint_state_publisher.publish(joint_state)
 
     # def latch(self):
     #     for name, joint in self.joints.items():
@@ -85,18 +98,6 @@ class TunnelNode(Node):
     # def disable_all_joints(self):
     #     for name, joint in self.joints.items():
     #         joint.stepper.disable()
-
-    # def _publish_joint_state(self, handle, value):
-    #     joint_state = JointState()
-    #     joint_state.header = Header()
-    #     now_frac, now_whole = math.modf(time())
-    #     joint_state.header.stamp.sec = int(now_whole)
-    #     joint_state.header.stamp.nanosec = int(now_frac * 1e9)
-    #     for name, joint in self.joints.items():
-    #         joint_state.name.append(name)
-    #         joint_state.position.append(joint.stepper.get_position())
-    #         joint_state.velocity.append(joint.stepper.get_velocity())
-    #     self._joint_state_publisher.publish(joint_state)
 
     # def _joint_target_callback(self, msg):
     #     if len(msg.name) == len(msg.velocity) == len(msg.position):

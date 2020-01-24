@@ -70,10 +70,17 @@ class Tunnel():
 
         self.set_limit_switches_to_find_latch_positions()
 
-        # while self.any_latches_moving():
-        #     pass
+        self.logger.info('waiting for latches to stop moving..')
+        while self.any_latches_moving():
+            pass
+        self.logger.info('latches to stop moving..')
 
-        # self.set_limit_switches_to_latch()
+        self.unlatch_all()
+
+        while self.any_latches_moving():
+            pass
+
+        self.set_limit_switches_to_latch()
 
     def _trigger_find_latch_positions_handler(self, handle, state):
         for name, latch in self.latches.items():
@@ -100,7 +107,7 @@ class Tunnel():
                 return
             if not latch.stepper_joint.limit_switch.is_active():
                 return
-        self.latch()
+        self.latch_all()
 
     def home_latches(self):
         for name, latch in self.latches.items():
@@ -134,6 +141,10 @@ class Tunnel():
             limit_switch = latch.stepper_joint.limit_switch
             limit_switch.set_on_state_change_handler(self._latch_handler)
 
-    def latch(self):
+    def latch_all(self):
         for name, latch in self.latches.items():
             latch.latch()
+
+    def unlatch_all(self):
+        for name, latch in self.latches.items():
+            latch.unlatch()

@@ -42,7 +42,6 @@ class LatchInfo():
         self.find_latch_position_velocity_limit = 1000
         self.find_latch_position_target_position = 10000
         self.latch_position = 1000
-        self.unlatch_position = 100
 
 class Latch():
     def __init__(self, latch_info, name, logger):
@@ -68,10 +67,15 @@ class Latch():
 
     def _find_latch_position_handler(self, handle, state):
         if self.stepper_joint.limit_switch.is_active():
+            self.stepper_joint.stepper.stop()
             latch_position = self.stepper_joint.stepper.get_position()
-            msg = '{0 latch position is {1}'.format(self.name, latch_position)
+            msg = '{0} latch position is {1}'.format(self.name, latch_position)
             self.logger.info(msg)
-            self.stepper_joint.limit_switch.set_on_state_change_handler(None)
+            self.latch_info.latch_position = latch_position
+            self.stepper_joint.set_limit_switch_to_stop()
 
     def latch(self):
         self.stepper_joint.stepper.set_target_position(self.latch_info.latch_position)
+
+    def unlatch(self):
+        self.stepper_joint.stepper.home()
