@@ -51,6 +51,9 @@ class TunnelNode(Node):
 
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
 
+        self.tunnel.home_latches()
+        self.tunnel.set_limit_switches_handler(self._latch_handler)
+
         for name, latch in self.tunnel.latches.items():
             latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
             latch.stepper_joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
@@ -63,6 +66,8 @@ class TunnelNode(Node):
         # self._joint_target_subscription  # prevent unused variable warning
 
     def _publish_joint_state(self, handle, value):
+        if not self.tunnel.all_latches_homed:
+            return
         joint_state = JointState()
         joint_state.header = Header()
         now_frac, now_whole = math.modf(time())
@@ -74,30 +79,20 @@ class TunnelNode(Node):
             joint_state.velocity.append(latch.stepper_joint.stepper.get_velocity())
         self._joint_state_publisher.publish(joint_state)
 
-    # def latch(self):
-    #     for name, joint in self.joints.items():
-    #         joint.stepper.set_target_position(self.tunnel_info.latch_position)
+    def _latch_handler(self, handle, state):
+        for name, latch in self.tunnel.latches.items():
+            if not latch.stepper_joint.homed:
+                return
+            if not latch.stepper_joint.limit_switch.is_active():
+                return
+        self.tunnel.latch_all()
 
-    # def _find_latch_positions(self):
-    #     for name, latch_switch in self.latch_switches.items():
-    #         if not latch_switch.is_active():
-    #             latch_switch.set_on_state_change_handler(self._find_latch_position_handler)
-    #             stepper = self.joints[name].stepper
-    #             stepper.set_velocity_limit(1000)
-    #             stepper.set_target_position(10000)
+        timer_period = 3
+        self.timer = self.create_timer(timer_period, self._unlatch_callback)
 
-    # def _find_latch_position_handler(self, handle, state):
-    #     for name, latch_switch in self.latch_switches.items():
-    #         if latch_switch.is_handle(handle):
-    #             if latch_switch.is_active():
-    #                 latch_position = self.joints[name].stepper.get_position()
-    #                 msg = '{0 latch position is {1}'.format(latch_switch.name, latch_position)
-    #                 self.logger.info(msg)
-    #                 latch_switch.set_on_state_change_handler(None)
-
-    # def disable_all_joints(self):
-    #     for name, joint in self.joints.items():
-    #         joint.stepper.disable()
+    def _unlatch_callback(self):
+        self.timer.reset()
+        self.tunnel.unlatch_all()
 
     # def _joint_target_callback(self, msg):
     #     if len(msg.name) == len(msg.velocity) == len(msg.position):
