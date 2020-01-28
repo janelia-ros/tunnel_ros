@@ -51,12 +51,10 @@ class TunnelNode(Node):
 
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
 
+        self.tunnel.set_stepper_on_change_handlers_to_disabled()
+        self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
+        self.tunnel.set_limit_switch_handlers_to_disabled()
         self.tunnel.home_latches()
-        self.tunnel.set_limit_switches_handler(self._latch_handler)
-
-        for name, latch in self.tunnel.latches.items():
-            latch.stepper_joint.stepper.set_on_position_change_handler(self._publish_joint_state)
-            latch.stepper_joint.stepper.set_on_velocity_change_handler(self._publish_joint_state)
 
         # self._joint_target_subscription = self.create_subscription(
         #     JointState,
@@ -65,7 +63,7 @@ class TunnelNode(Node):
         #     10)
         # self._joint_target_subscription  # prevent unused variable warning
 
-    def _publish_joint_state(self, handle, value):
+    def _publish_joint_state_handler(self, handle, value):
         if not self.tunnel.all_latches_homed:
             return
         joint_state = JointState()
@@ -79,20 +77,40 @@ class TunnelNode(Node):
             joint_state.velocity.append(latch.stepper_joint.stepper.get_velocity())
         self._joint_state_publisher.publish(joint_state)
 
-    def _latch_handler(self, handle, state):
+    def _homed_handler(self, handle):
         for name, latch in self.tunnel.latches.items():
             if not latch.stepper_joint.homed:
                 return
+        self.tunnel.set_stepper_on_change_handlers(self._publish_joint_state_handler)
+        self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
+        self.tunnel.set_limit_switch_handlers(self._latch_handler)
+
+    def _latch_handler(self, handle, state):
+        for name, latch in self.tunnel.latches.items():
             if not latch.stepper_joint.limit_switch.is_active():
                 return
+        self.tunnel.set_stepper_on_stopped_handlers(self._latched_handler)
+        self.tunnel.set_limit_switch_handlers_to_disabled()
         self.tunnel.latch_all()
 
+    def _latched_handler(self, handle):
+        for name, latch in self.tunnel.latches.items():
+            if latch.stepper_joint.stepper.is_moving():
+                return
         timer_period = 3
-        self.timer = self.create_timer(timer_period, self._unlatch_callback)
+        self.timer = self.create_timer(timer_period, self._unlatch_timer_callback)
 
-    def _unlatch_callback(self):
-        self.timer.reset()
+    def _unlatch_timer_callback(self):
+        self.timer.cancel()
+        self.tunnel.set_stepper_on_stopped_handlers(self._unlatched_handler)
         self.tunnel.unlatch_all()
+
+    def _unlatched_handler(self, handle):
+        for name, latch in self.tunnel.latches.items():
+            if latch.stepper_joint.stepper.is_moving():
+                return
+        self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
+        self.tunnel.set_limit_switch_handlers(self._latch_handler)
 
     # def _joint_target_callback(self, msg):
     #     if len(msg.name) == len(msg.velocity) == len(msg.position):

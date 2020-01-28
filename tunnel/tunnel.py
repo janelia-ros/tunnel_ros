@@ -65,6 +65,60 @@ class Tunnel():
                 latch.close()
             raise e
 
+    def set_stepper_on_change_handlers(self, stepper_on_change_handler):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.stepper.set_on_position_change_handler(stepper_on_change_handler)
+            latch.stepper_joint.stepper.set_on_velocity_change_handler(stepper_on_change_handler)
+
+    def set_stepper_on_change_handlers_to_disabled(self):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.stepper.set_on_position_change_handler(None)
+            latch.stepper_joint.stepper.set_on_velocity_change_handler(None)
+
+    def set_stepper_on_stopped_handlers(self, stepper_on_stopped_handler):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.stepper.set_on_stopped_handler(stepper_on_stopped_handler)
+
+    def set_stepper_on_stopped_handlers_to_disabled(self):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.stepper.set_on_stopped_handler(None)
+
+    def set_limit_switch_handlers(self, limit_switch_handler):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.set_limit_switch_handler(limit_switch_handler)
+
+    def set_limit_switch_handlers_to_disabled(self):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.set_limit_switch_handler_to_disabled()
+
+    def home_latches(self):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.home()
+
+    def all_latches_homed(self):
+        all_homed = True
+        for name, latch in self.latches.items():
+            if not latch.stepper_joint.homed:
+                all_homed = False
+                break
+        return all_homed
+
+    def any_latches_moving(self):
+        any_moving = False
+        for name, latch in self.latches.items():
+            if latch.stepper_joint.stepper.is_moving():
+                any_moving = True
+                break
+        return any_moving
+
+    def latch_all(self):
+        for name, latch in self.latches.items():
+            latch.latch()
+
+    def unlatch_all(self):
+        for name, latch in self.latches.items():
+            latch.unlatch()
+
     # def calibrate_latches(self):
         # self.home_latches()
         # while not self.all_latches_homed():
@@ -111,57 +165,3 @@ class Tunnel():
     #     for name, latch in self.latches.items():
     #         latch.find_latch_position()
     #     self.waiting_for_find_latch_positions_trigger = False
-
-    def home_latches(self):
-        for name, latch in self.latches.items():
-            latch.stepper_joint.home()
-
-    def all_latches_homed(self):
-        all_homed = True
-        for name, latch in self.latches.items():
-            if not latch.stepper_joint.homed:
-                all_homed = False
-                break
-        return all_homed
-
-    def any_latches_moving(self):
-        any_moving = False
-        for name, latch in self.latches.items():
-            if latch.stepper_joint.stepper.is_moving():
-                any_moving = True
-                break
-        return any_moving
-
-    # def set_limit_switches_to_find_latch_positions(self):
-    #     self.waiting_for_find_latch_positions_trigger = True
-    #     for name, latch in self.latches.items():
-    #         limit_switch = latch.stepper_joint.limit_switch
-    #         limit_switch.set_on_state_change_handler(self._trigger_find_latch_positions_handler)
-    #     msg = 'Waiting for headbar trigger to find latch positions...'
-    #     self.logger.info(msg)
-
-    # def set_limit_switches_to_latch(self):
-    #     for name, latch in self.latches.items():
-    #         limit_switch = latch.stepper_joint.limit_switch
-    #         limit_switch.set_on_state_change_handler(self._latch_handler)
-
-    def set_limit_switches_handler(self, limit_switches_handler):
-        for name, latch in self.latches.items():
-            limit_switch = latch.stepper_joint.limit_switch
-            limit_switch.set_on_state_change_handler(limit_switches_handler)
-
-    # def _latch_handler(self, handle, state):
-    #     for name, latch in self.latches.items():
-    #         if not latch.stepper_joint.homed:
-    #             return
-    #         if not latch.stepper_joint.limit_switch.is_active():
-    #             return
-    #     self.latch_all()
-
-    def latch_all(self):
-        for name, latch in self.latches.items():
-            latch.latch()
-
-    def unlatch_all(self):
-        for name, latch in self.latches.items():
-            latch.unlatch()
