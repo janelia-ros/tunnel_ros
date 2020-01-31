@@ -51,19 +51,32 @@ class Tunnel():
         self.name = name
         self.logger = logger
 
-        self._setup_tunnel()
-
-    def _setup_tunnel(self):
         self.latches = {}
-        try:
-            for name, info in self.tunnel_info.latches_info.items():
-                self.latches[name] = Latch(info, self.name + '_' + name + "_latch", self.logger)
+        for name, info in self.tunnel_info.latches_info.items():
+            self.latches[name] = Latch(info, self.name + '_' + name + "_latch", self.logger)
 
-        except PhidgetException as e:
-            self.logger.error(str(e))
-            for name, latch in self.latches.items():
-                latch.close()
-            raise e
+    def open(self):
+        for name, latch in self.latches.items():
+            latch.open()
+
+    def close(self):
+        for name, latch in self.latches.items():
+            latch.close()
+
+    def set_on_attach_handler(self, on_attach_handler):
+        for name, latch in self.latches.items():
+            latch.set_on_attach_handler(on_attach_handler)
+
+    def _on_attach_handler(self, handle):
+        for name, latch in self.latches.items():
+            if latch.has_handle(handle):
+                latch._on_attach_handler(handle)
+
+    def is_attached(self):
+        for name, latch in self.latches.items():
+            if not latch.is_attached():
+                return False
+        return True
 
     def set_stepper_on_change_handlers(self, stepper_on_change_handler):
         for name, latch in self.latches.items():
@@ -118,50 +131,3 @@ class Tunnel():
     def unlatch_all(self):
         for name, latch in self.latches.items():
             latch.unlatch()
-
-    # def calibrate_latches(self):
-        # self.home_latches()
-        # while not self.all_latches_homed():
-        #     pass
-        #     self.logger.info('waiting while any latches are homing...')
-        #     time.sleep(0.2)
-        # self.logger.info('all latches homed')
-
-        # self.set_limit_switches_to_find_latch_positions()
-
-        # while self.waiting_for_find_latch_positions_trigger:
-        #     pass
-        #     self.logger.info('waiting for find latch positions trigger...')
-        #     time.sleep(0.2)
-        # self.logger.info('find latch positions triggered')
-
-        # while self.any_latches_moving():
-        #     pass
-        #     self.logger.info('waiting for latch positions to be found...')
-        #     time.sleep(0.2)
-        # self.logger.info('latch positions found')
-
-        # self.unlatch_all()
-
-        # while self.any_latches_moving():
-        #     pass
-
-    # def _trigger_find_latch_positions_handler(self, handle, state):
-    #     for name, latch in self.latches.items():
-    #         if not latch.stepper_joint.homed:
-    #             return
-    #         if not latch.stepper_joint.limit_switch.is_active():
-    #             return
-    #     limit_switch = latch.stepper_joint.limit_switch
-    #     limit_switch.set_on_state_change_handler(self._find_latch_positions_handler)
-
-    # def _find_latch_positions_handler(self, handle, state):
-    #     for name, latch in self.latches.items():
-    #         if not latch.stepper_joint.homed:
-    #             return
-    #         if latch.stepper_joint.limit_switch.is_active():
-    #             return
-
-    #     for name, latch in self.latches.items():
-    #         latch.find_latch_position()
-    #     self.waiting_for_find_latch_positions_trigger = False

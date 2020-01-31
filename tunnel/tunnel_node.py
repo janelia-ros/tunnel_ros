@@ -44,17 +44,7 @@ class TunnelNode(Node):
         self.name = 'tunnel'
         self.logger = self.get_logger()
 
-        self._setup_tunnel_node()
-
-    def _setup_tunnel_node(self):
-        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
-
         self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
-
-        self.tunnel.set_stepper_on_change_handlers_to_disabled()
-        self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
-        self.tunnel.set_limit_switch_handlers_to_disabled()
-        self.tunnel.home_latches()
 
         # self._joint_target_subscription = self.create_subscription(
         #     JointState,
@@ -62,6 +52,30 @@ class TunnelNode(Node):
         #     self._joint_target_callback,
         #     10)
         # self._joint_target_subscription  # prevent unused variable warning
+
+        self._attached_timer_period = 1
+        self._attached_timer = None
+        self._latched_timer_period = 5
+        self._latched_timer = None
+
+        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
+        self.tunnel.set_stepper_on_change_handlers_to_disabled()
+        self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
+        self.tunnel.set_limit_switch_handlers_to_disabled()
+        self.tunnel.set_on_attach_handler(self._on_attach_handler)
+        self.tunnel.open()
+
+    def _on_attach_handler(self, handle):
+        self.tunnel._on_attach_handler(handle)
+        if self._attached_timer is None:
+            self._attached_timer = self.create_timer(self._attached_timer_period, self._attached_timer_callback)
+
+    def _attached_timer_callback(self):
+        self._attached_timer.cancel()
+        self._attached_timer = None
+        if self.tunnel.is_attached():
+            self.logger.info('tunnel is attached!')
+            self.tunnel.home_latches()
 
     def _publish_joint_state_handler(self, handle, value):
         if not self.tunnel.all_latches_homed:
@@ -97,11 +111,11 @@ class TunnelNode(Node):
         for name, latch in self.tunnel.latches.items():
             if latch.stepper_joint.stepper.is_moving():
                 return
-        timer_period = 3
-        self.timer = self.create_timer(timer_period, self._unlatch_timer_callback)
+        self._latched_timer = self.create_timer(self._latched_timer_period, self._latched_timer_callback)
 
-    def _unlatch_timer_callback(self):
-        self.timer.cancel()
+    def _latched_timer_callback(self):
+        self._latched_timer.cancel()
+        self._latched_timer = None
         self.tunnel.set_stepper_on_stopped_handlers(self._unlatched_handler)
         self.tunnel.unlatch_all()
 

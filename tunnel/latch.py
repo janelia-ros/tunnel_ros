@@ -49,30 +49,25 @@ class Latch():
         self.name = name
         self.logger = logger
 
-        self._setup_latch()
-
-    def _setup_latch(self):
         self.stepper_joint = StepperJoint(self.latch_info.stepper_joint_info, self.name, self.logger)
 
-    # def find_latch_position(self):
-    #     if not self.stepper_joint.homed:
-    #         return
+    def open(self):
+        self.stepper_joint.open()
 
-    #     while self.stepper_joint.limit_switch.is_active():
-    #         pass
+    def close(self):
+        self.stepper_joint.close()
 
-    #     self.stepper_joint.limit_switch.set_on_state_change_handler(self._find_latch_position_handler)
-    #     self.stepper_joint.stepper.set_velocity_limit(self.latch_info.find_latch_position_velocity_limit)
-    #     self.stepper_joint.stepper.set_target_position(self.latch_info.find_latch_position_target_position)
+    def has_handle(self, handle):
+        return self.stepper_joint.has_handle(handle)
 
-    # def _find_latch_position_handler(self, handle, state):
-    #     if self.stepper_joint.limit_switch.is_active():
-    #         self.stepper_joint.stepper.stop()
-    #         latch_position = self.stepper_joint.stepper.get_position()
-    #         msg = '{0} latch position is {1}'.format(self.name, latch_position)
-    #         self.logger.info(msg)
-    #         self.latch_info.latch_position = latch_position
-    #         self.stepper_joint.set_limit_switch_to_disabled()
+    def set_on_attach_handler(self, on_attach_handler):
+        self.stepper_joint.set_on_attach_handler(on_attach_handler)
+
+    def _on_attach_handler(self, handle):
+        self.stepper_joint._on_attach_handler(handle)
+
+    def is_attached(self):
+        return self.stepper_joint.is_attached()
 
     def latch(self):
         self.stepper_joint.stepper.set_target_position(self.latch_info.latch_position)
