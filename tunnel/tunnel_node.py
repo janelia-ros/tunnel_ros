@@ -63,6 +63,7 @@ class TunnelNode(Node):
         self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
         self.tunnel.set_limit_switch_handlers_to_disabled()
         self.tunnel.set_on_attach_handler(self._on_attach_handler)
+        self.logger.info('opening tunnel phidgets...')
         self.tunnel.open()
 
     def _on_attach_handler(self, handle):

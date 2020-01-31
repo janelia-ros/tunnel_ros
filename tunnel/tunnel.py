@@ -35,13 +35,19 @@ class TunnelInfo():
         self.latches_info = {'right': LatchInfo(), 'left': LatchInfo()}
 
         self.latches_info['right'].stepper_joint_info.stepper_info.phidget_info.hub_port = 0
+        self.latches_info['right'].stepper_joint_info.stepper_info.phidget_info.label = 'tunnel_0'
         self.latches_info['right'].stepper_joint_info.home_switch_info.phidget_info.hub_port = 1
+        self.latches_info['right'].stepper_joint_info.home_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['right'].stepper_joint_info.limit_switch_info.phidget_info.hub_port = 2
+        self.latches_info['right'].stepper_joint_info.limit_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['right'].stepper_joint_info.stepper_info.invert_direction = True
 
         self.latches_info['left'].stepper_joint_info.stepper_info.phidget_info.hub_port = 5
+        self.latches_info['left'].stepper_joint_info.stepper_info.phidget_info.label = 'tunnel_0'
         self.latches_info['left'].stepper_joint_info.home_switch_info.phidget_info.hub_port = 4
+        self.latches_info['left'].stepper_joint_info.home_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['left'].stepper_joint_info.limit_switch_info.phidget_info.hub_port = 3
+        self.latches_info['left'].stepper_joint_info.limit_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['left'].stepper_joint_info.stepper_info.invert_direction = False
 
 
