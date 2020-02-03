@@ -25,7 +25,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from Phidget22.PhidgetException import *
 from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
 from phidgets_python_api.digital_input import DigitalInputInfo
 
