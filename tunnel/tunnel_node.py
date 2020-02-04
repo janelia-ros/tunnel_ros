@@ -29,11 +29,12 @@ import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import Header
-from sensor_msgs.msg import JointState
+from smart_cage_msgs.msg import TunnelState
 
 from .tunnel import Tunnel, TunnelInfo
 
-from time import time
+import time
+import datetime
 import math
 
 class TunnelNode(Node):
@@ -44,10 +45,10 @@ class TunnelNode(Node):
         self.name = 'tunnel'
         self.logger = self.get_logger()
 
-        self._joint_state_publisher = self.create_publisher(JointState, 'tunnel_joint_state', 10)
+        self._tunnel_state_publisher = self.create_publisher(TunnelState, 'tunnel_state', 10)
 
         # self._joint_target_subscription = self.create_subscription(
-        #     JointState,
+        #     TunnelState,
         #     'tunnel_joint_target',
         #     self._joint_target_callback,
         #     10)
@@ -59,9 +60,6 @@ class TunnelNode(Node):
         self._latched_timer = None
 
         self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
-        self.tunnel.set_stepper_on_change_handlers_to_disabled()
-        self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
-        self.tunnel.set_limit_switch_handlers_to_disabled()
         self.tunnel.set_on_attach_handler(self._on_attach_handler)
         self.logger.info('opening tunnel phidgets...')
         self.tunnel.open()
@@ -76,36 +74,44 @@ class TunnelNode(Node):
         self._attached_timer = None
         if self.tunnel.is_attached():
             self.logger.info('tunnel is attached!')
+            self.tunnel.set_stepper_on_change_handlers_to_disabled()
+            self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
+            self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
+            self.tunnel.voltage_ratio_input.set_on_voltage_ratio_change_handler(self._publish_tunnel_state_handler)
             self.tunnel.home_latches()
 
-    def _publish_joint_state_handler(self, handle, value):
-        if not self.tunnel.all_latches_homed:
-            return
-        joint_state = JointState()
-        joint_state.header = Header()
-        now_frac, now_whole = math.modf(time())
-        joint_state.header.stamp.sec = int(now_whole)
-        joint_state.header.stamp.nanosec = int(now_frac * 1e9)
+    def _publish_tunnel_state_handler(self, handle, value):
+        tunnel_state = TunnelState()
+        tunnel_state.header = Header()
+        now_frac, now_whole = math.modf(time.time())
+        tunnel_state.header.stamp.sec = int(now_whole)
+        tunnel_state.header.stamp.nanosec = int(now_frac * 1e9)
         for name, latch in self.tunnel.latches.items():
-            joint_state.name.append(name)
-            joint_state.position.append(latch.stepper_joint.stepper.get_position())
-            joint_state.velocity.append(latch.stepper_joint.stepper.get_velocity())
-        self._joint_state_publisher.publish(joint_state)
+            tunnel_state.name.append(name)
+            tunnel_state.latch_position.append(latch.stepper_joint.stepper.get_position())
+            tunnel_state.head_bar_sensor_active.append(latch.stepper_joint.limit_switch.is_active())
+        tunnel_state.load_cell_voltage_ratio = self.tunnel.voltage_ratio_input.get_voltage_ratio()
+        tunnel_state.perf_counter = time.perf_counter()
+        tunnel_state.now = str(datetime.datetime.now())
+        self._tunnel_state_publisher.publish(tunnel_state)
 
     def _homed_handler(self, handle):
         for name, latch in self.tunnel.latches.items():
             if not latch.stepper_joint.homed:
                 return
-        self.tunnel.set_stepper_on_change_handlers(self._publish_joint_state_handler)
+        self.tunnel.set_stepper_on_change_handlers(self._publish_tunnel_state_handler)
         self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
         self.tunnel.set_limit_switch_handlers(self._latch_handler)
 
     def _latch_handler(self, handle, state):
         for name, latch in self.tunnel.latches.items():
+            self._publish_tunnel_state_handler(handle, state)
             if not latch.stepper_joint.limit_switch.is_active():
                 return
+            if not latch.stepper_joint.stepper.in_step_control_mode():
+                return
         self.tunnel.set_stepper_on_stopped_handlers(self._latched_handler)
-        self.tunnel.set_limit_switch_handlers_to_disabled()
+        self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
         self.tunnel.latch_all()
 
     def _latched_handler(self, handle):

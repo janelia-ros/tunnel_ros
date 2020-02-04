@@ -25,6 +25,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import Phidget22.Devices.VoltageRatioInput
+from phidgets_python_api.voltage_ratio_input import VoltageRatioInput, VoltageRatioInputInfo
+
 from .latch import Latch, LatchInfo
 
 class TunnelInfo():
@@ -47,6 +50,10 @@ class TunnelInfo():
         self.latches_info['left'].stepper_joint_info.limit_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['left'].stepper_joint_info.stepper_info.invert_direction = False
 
+        self.voltage_ratio_input_info = VoltageRatioInputInfo()
+        self.voltage_ratio_input_info.bridge_gain = Phidget22.Devices.VoltageRatioInput.BridgeGain.BRIDGE_GAIN_64
+        self.voltage_ratio_input_info.voltage_ratio_change_trigger = 0.0
+
 
 class Tunnel():
     def __init__(self, tunnel_info, name, logger):
@@ -56,29 +63,43 @@ class Tunnel():
 
         self.latches = {}
         for name, info in self.tunnel_info.latches_info.items():
-            self.latches[name] = Latch(info, self.name + '_' + name + "_latch", self.logger)
+            self.latches[name] = Latch(info,
+                                       self.name + '_' + name + "_latch",
+                                       self.logger)
+
+        self.voltage_ratio_input = VoltageRatioInput(self.tunnel_info.voltage_ratio_input_info,
+                                                     self.name + '_load_cell',
+                                                     self.logger)
 
     def open(self):
         for name, latch in self.latches.items():
             latch.open()
+        self.voltage_ratio_input.open()
 
     def close(self):
         for name, latch in self.latches.items():
             latch.close()
+        self.voltage_ratio_input.close()
 
     def set_on_attach_handler(self, on_attach_handler):
         for name, latch in self.latches.items():
             latch.set_on_attach_handler(on_attach_handler)
+        self.voltage_ratio_input.set_on_attach_handler(on_attach_handler)
 
     def _on_attach_handler(self, handle):
         for name, latch in self.latches.items():
             if latch.has_handle(handle):
                 latch._on_attach_handler(handle)
+                return
+        if self.voltage_ratio_input.has_handle(handle):
+            self.voltage_ratio_input._on_attach_handler(handle)
 
     def is_attached(self):
         for name, latch in self.latches.items():
             if not latch.is_attached():
                 return False
+        if not self.voltage_ratio_input.is_attached():
+            return False
         return True
 
     def set_stepper_on_change_handlers(self, stepper_on_change_handler):
@@ -102,10 +123,6 @@ class Tunnel():
     def set_limit_switch_handlers(self, limit_switch_handler):
         for name, latch in self.latches.items():
             latch.stepper_joint.set_limit_switch_handler(limit_switch_handler)
-
-    def set_limit_switch_handlers_to_disabled(self):
-        for name, latch in self.latches.items():
-            latch.stepper_joint.set_limit_switch_handler_to_disabled()
 
     def home_latches(self):
         for name, latch in self.latches.items():

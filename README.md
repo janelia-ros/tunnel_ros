@@ -5,7 +5,7 @@ This is the ROS tunnel interface.
 
 Published Topics
 ----------------
-* `/tunnel_joint_state` (`sensor_msgs/JointState`) - A joint state message containing the current state of all joints.
+* `/tunnel_state` (`smart_cage_msgs/TunnelState`) - A joint state message containing the current state of all joints.
 
 Subscribed Topics
 -----------------
@@ -20,6 +20,6 @@ Command Line Examples
 
 ```bash
 ros2 run tunnel tunnel
-ros2 topic echo /tunnel_joint_state
+ros2 topic echo /tunnel_state
 ros2 topic pub -1 /tunnel_joint_target sensor_msgs/JointState "{name: [right,left], position: [1000,1000]}"
 ```
