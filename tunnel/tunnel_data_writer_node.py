@@ -32,6 +32,7 @@ from smart_cage_msgs.msg import TunnelState
 
 from pathlib import Path
 import datetime
+import csv
 
 class TunnelDataWriterNode(Node):
     def __init__(self):
@@ -50,9 +51,26 @@ class TunnelDataWriterNode(Node):
         self.path.mkdir(parents=True)
         self.logger.info('created directory: ' + str(self.path))
         self.data_path = self.path / 'data.txt'
+        self.data_file = open(self.data_path, 'w', newline='')
+        self.fieldnames = ['time_in_seconds',
+                           'load_cell_voltage_ratio',
+                           'right_head_bar_sensor_state',
+                           'left_head_bar_sensor_state',
+                           'latch_position',
+                           'now']
+        self.data_writer = csv.DictWriter(self.data_file,
+                                          delimiter=' ',
+                                          quotechar='|',
+                                          quoting=csv.QUOTE_MINIMAL,
+                                          fieldnames=self.fieldnames)
+        self.data_writer.writeheader()
 
     def _tunnel_state_callback(self, msg):
-        pass
+        msg_dict = {field: getattr(msg, field) for field in msg._fields_and_field_types if hasattr(msg, field)}
+        self.data_writer.writerow(msg_dict)
+
+    def close_files(self):
+        self.data_file.close()
 
 def main(args=None):
     rclpy.init(args=args)
@@ -61,6 +79,7 @@ def main(args=None):
 
     rclpy.spin(tunnel_data_writer_node)
 
+    tunnel_data_writer_node.close_files()
     tunnel_data_writer_node.destroy_node()
     rclpy.shutdown()
 

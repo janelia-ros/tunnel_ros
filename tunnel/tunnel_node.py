@@ -82,16 +82,11 @@ class TunnelNode(Node):
 
     def _publish_tunnel_state_handler(self, handle, value):
         tunnel_state = TunnelState()
-        tunnel_state.header = Header()
-        now_frac, now_whole = math.modf(time.time())
-        tunnel_state.header.stamp.sec = int(now_whole)
-        tunnel_state.header.stamp.nanosec = int(now_frac * 1e9)
-        for name, latch in self.tunnel.latches.items():
-            tunnel_state.name.append(name)
-            tunnel_state.latch_position.append(latch.stepper_joint.stepper.get_position())
-            tunnel_state.head_bar_sensor_active.append(latch.stepper_joint.limit_switch.is_active())
+        tunnel_state.time_in_seconds = time.perf_counter()
         tunnel_state.load_cell_voltage_ratio = self.tunnel.voltage_ratio_input.get_voltage_ratio()
-        tunnel_state.perf_counter = time.perf_counter()
+        tunnel_state.right_head_bar_sensor_state = self.tunnel.latches['right'].stepper_joint.limit_switch.get_state()
+        tunnel_state.left_head_bar_sensor_state = self.tunnel.latches['left'].stepper_joint.limit_switch.get_state()
+        tunnel_state.latch_position = self.tunnel.latches['right'].stepper_joint.stepper.get_position()
         tunnel_state.now = str(datetime.datetime.now())
         self._tunnel_state_publisher.publish(tunnel_state)
 
