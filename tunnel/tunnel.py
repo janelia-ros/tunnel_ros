@@ -120,6 +120,10 @@ class Tunnel():
         for name, latch in self.latches.items():
             latch.stepper_joint.stepper.set_on_stopped_handler(None)
 
+    def set_stepper_on_homed_handlers(self, on_homed_handler):
+        for name, latch in self.latches.items():
+            latch.stepper_joint.set_on_homed_handler(on_homed_handler)
+
     def set_limit_switch_handlers(self, limit_switch_handler):
         for name, latch in self.latches.items():
             latch.stepper_joint.set_limit_switch_handler(limit_switch_handler)

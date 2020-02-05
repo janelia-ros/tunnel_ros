@@ -33,8 +33,8 @@ from smart_cage_msgs.msg import TunnelState
 from .tunnel import Tunnel, TunnelInfo
 
 import time
-import math
 import datetime
+import math
 
 class TunnelNode(Node):
     def __init__(self):
@@ -74,7 +74,7 @@ class TunnelNode(Node):
         if self.tunnel.is_attached():
             self.logger.info('tunnel is attached!')
             self.tunnel.set_stepper_on_change_handlers_to_disabled()
-            self.tunnel.set_stepper_on_stopped_handlers(self._homed_handler)
+            self.tunnel.set_stepper_on_homed_handlers(self._homed_handler)
             self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
             self.tunnel.voltage_ratio_input.set_on_voltage_ratio_change_handler(self._publish_tunnel_state_handler)
             self.tunnel.home_latches()
