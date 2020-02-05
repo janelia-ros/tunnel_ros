@@ -28,14 +28,13 @@
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Header
 from smart_cage_msgs.msg import TunnelState
 
 from .tunnel import Tunnel, TunnelInfo
 
 import time
-import datetime
 import math
+import datetime
 
 class TunnelNode(Node):
     def __init__(self):
@@ -81,13 +80,17 @@ class TunnelNode(Node):
             self.tunnel.home_latches()
 
     def _publish_tunnel_state_handler(self, handle, value):
+        if not self.tunnel.all_latches_homed:
+            return
         tunnel_state = TunnelState()
-        tunnel_state.time_in_seconds = time.perf_counter()
+        tunnel_state.datetime = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        now_frac, now_whole = math.modf(time.time())
+        tunnel_state.nanosec = int(now_frac * 1e9)
         tunnel_state.load_cell_voltage_ratio = self.tunnel.voltage_ratio_input.get_voltage_ratio()
-        tunnel_state.right_head_bar_sensor_state = self.tunnel.latches['right'].stepper_joint.limit_switch.get_state()
-        tunnel_state.left_head_bar_sensor_state = self.tunnel.latches['left'].stepper_joint.limit_switch.get_state()
-        tunnel_state.latch_position = self.tunnel.latches['right'].stepper_joint.stepper.get_position()
-        tunnel_state.now = str(datetime.datetime.now())
+        tunnel_state.right_head_bar_sensor_active = self.tunnel.latches['right'].stepper_joint.limit_switch.is_active()
+        tunnel_state.left_head_bar_sensor_active = self.tunnel.latches['left'].stepper_joint.limit_switch.is_active()
+        tunnel_state.right_latch_position = self.tunnel.latches['right'].stepper_joint.stepper.get_position()
+        tunnel_state.left_latch_position = self.tunnel.latches['left'].stepper_joint.stepper.get_position()
         self._tunnel_state_publisher.publish(tunnel_state)
 
     def _homed_handler(self, handle):

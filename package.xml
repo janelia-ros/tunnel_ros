@@ -13,7 +13,6 @@
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>phidgets_python_api</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
   <exec_depend>smart_cage_msgs</exec_depend>
 
   <buildtool_depend>ament_python</buildtool_depend>
