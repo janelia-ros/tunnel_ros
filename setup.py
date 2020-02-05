@@ -34,8 +34,6 @@ setup(
         'console_scripts': [
             'tunnel_node ='
             ' tunnel.tunnel_node:main',
-            'tunnel_data_writer_node ='
-            ' tunnel.tunnel_data_writer_node:main',
         ],
     },
 )
