@@ -10,23 +10,23 @@
   - Author :: Peter Polidoro
   - Email :: peterpolidoro@gmail.com
 
-** Description
+* Description
 
-   This is the ROS tunnel interface.
+  This is the ROS tunnel interface.
 
-** Published Topics
-   - `/tunnel_state` (`smart_cage_msgs/TunnelState`) - A joint state message containing the current state of all joints.
+* Published Topics
+  - `/tunnel_state` (`smart_cage_msgs/TunnelState`) - A joint state message containing the current state of all joints.
 
-** Subscribed Topics
-   - `/tunnel_joint_target` (`sensor_msgs/JointState`) - Set joint state targets.
+* Subscribed Topics
+  - `/tunnel_joint_target` (`sensor_msgs/JointState`) - Set joint state targets.
 
-** Parameters
-   - `serial` (int) - The serial number of the phidgets motor to connect to.  If -1 (the default), connects to any motor phidget that can be found.
+* Parameters
+  - `serial` (int) - The serial number of the phidgets motor to connect to.  If -1 (the default), connects to any motor phidget that can be found.
 
-** Command Line Examples
+* Command Line Examples
 
-   #+BEGIN_SRC sh
-     ros2 launch tunnel tunnel.launch.py
-     ros2 topic echo /tunnel_state
-     ros2 topic pub -1 /tunnel_joint_target sensor_msgs/JointState "{name: [right,left], position: [1000,1000]}"
-   #+END_SRC
+  #+BEGIN_SRC sh
+    ros2 launch tunnel tunnel.launch.py
+    ros2 topic echo /tunnel_state
+    ros2 topic pub -1 /tunnel_joint_target sensor_msgs/JointState "{name: [right,left], position: [1000,1000]}"
+  #+END_SRC
