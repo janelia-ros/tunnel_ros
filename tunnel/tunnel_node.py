@@ -28,7 +28,7 @@
 import rclpy
 from rclpy.node import Node
 
-from smart_cage_msgs.msg import TunnelState
+from smart_cage_msgs.msg import TunnelState, TunnelControl
 
 from .tunnel import Tunnel, TunnelInfo
 
@@ -50,19 +50,21 @@ class TunnelNode(Node):
         self._latched_timer_period = 5
         self._latched_timer = None
 
+        self.latch_mode = False
+        self.latched = False
+
         self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
         self.tunnel.set_on_attach_handler(self._on_attach_handler)
         self.logger.info('opening tunnel phidgets...')
         self.tunnel.open()
 
         self._tunnel_state_publisher = self.create_publisher(TunnelState, 'tunnel_state')
-
-        # self._joint_target_subscription = self.create_subscription(
+        # self._tunnel_control_subscription = self.create_subscription(
         #     TunnelState,
-        #     'tunnel_joint_target',
-        #     self._joint_target_callback,
+        #     'tunnel_control',
+        #     self._tunnel_control_callback,
         #     10)
-        # self._joint_target_subscription  # prevent unused variable warning
+        # self._tunnel_control_subscription  # prevent unused variable warning
 
     def _on_attach_handler(self, handle):
         self.tunnel._on_attach_handler(handle)
@@ -96,47 +98,50 @@ class TunnelNode(Node):
         self._tunnel_state_publisher.publish(tunnel_state)
 
     def _homed_handler(self, handle):
-        for name, latch in self.tunnel.latches.items():
-            if not latch.stepper_joint.homed:
-                return
+        if not self.tunnel.all_latches_homed():
+            return
         self.tunnel.set_stepper_on_change_handlers(self._publish_tunnel_state_handler)
         self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
-        self.tunnel.set_limit_switch_handlers(self._latch_handler)
+        self.tunnel.set_limit_switch_handlers(self._trigger_latch_handler)
 
-    def _latch_handler(self, handle, state):
-        for name, latch in self.tunnel.latches.items():
-            self._publish_tunnel_state_handler(handle, state)
-            if not latch.stepper_joint.limit_switch.is_active():
-                return
-            if not latch.stepper_joint.stepper.in_step_control_mode():
-                return
-        self.tunnel.set_stepper_on_stopped_handlers(self._latched_handler)
-        self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
-        self.tunnel.latch_all()
+    def _trigger_latch_handler(self, handle, state):
+        self._publish_tunnel_state_handler(handle, state)
+        if not self.tunnel.all_limit_switches_active():
+            return
+        self.latch_all()
 
     def _latched_handler(self, handle):
-        for name, latch in self.tunnel.latches.items():
-            if latch.stepper_joint.stepper.is_moving():
-                return
+        if self.tunnel.any_latches_moving():
+            return
+        self.latched = True
         if self._latched_timer is None:
             self._latched_timer = threading.Timer(self._latched_timer_period, self._latched_timer_callback)
             self._latched_timer.start()
         self.logger.info('latched!')
 
     def _latched_timer_callback(self):
-        self.logger.info('latched_timer_callback')
         self._latched_timer = None
+        self.unlatch_all()
+
+    def _unlatched_handler(self, handle):
+        if self.tunnel.any_latches_moving():
+            return
+        self.latched = False
+        self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
+        self.tunnel.set_limit_switch_handlers(self._trigger_latch_handler)
+
+    def latch_all(self):
+        if not self.tunnel.all_steppers_in_step_control_mode():
+            return
+        self.tunnel.set_stepper_on_stopped_handlers(self._latched_handler)
+        self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
+        self.tunnel.latch_all()
+
+    def unlatch_all(self):
         self.tunnel.set_stepper_on_stopped_handlers(self._unlatched_handler)
         self.tunnel.unlatch_all()
 
-    def _unlatched_handler(self, handle):
-        for name, latch in self.tunnel.latches.items():
-            if latch.stepper_joint.stepper.is_moving():
-                return
-        self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
-        self.tunnel.set_limit_switch_handlers(self._latch_handler)
-
-    # def _joint_target_callback(self, msg):
+    # def _tunnel_control_callback(self, msg):
     #     if len(msg.name) == len(msg.velocity) == len(msg.position):
     #         targets = zip(msg.name, msg.velocity, msg.position)
     #         for name, velocity, position in targets:
@@ -161,6 +166,9 @@ def main(args=None):
 
     rclpy.spin(tunnel_node)
 
+    tunnel_node.unlatch_all()
+    while tunnel_node.latched:
+        time.sleep(1)
     tunnel_node.destroy_node()
     rclpy.shutdown()
 

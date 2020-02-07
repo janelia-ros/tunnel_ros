@@ -148,6 +148,22 @@ class Tunnel():
                 break
         return any_moving
 
+    def all_limit_switches_active(self):
+        all_active = True
+        for name, latch in self.latches.items():
+            if not latch.stepper_joint.limit_switch.is_active():
+                all_active = False
+                break
+        return all_active
+
+    def all_steppers_in_step_control_mode(self):
+        all_in_step_control_mode = True
+        for name, latch in self.latches.items():
+            if not latch.stepper_joint.stepper.in_step_control_mode():
+                all_in_step_control_mode = False
+                break
+        return all_in_step_control_mode
+
     def latch_all(self):
         for name, latch in self.latches.items():
             latch.latch()
