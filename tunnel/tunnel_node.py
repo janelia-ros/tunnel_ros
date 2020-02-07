@@ -33,6 +33,7 @@ from smart_cage_msgs.msg import TunnelState
 from .tunnel import Tunnel, TunnelInfo
 
 import time
+import threading
 import datetime
 import math
 
@@ -44,15 +45,6 @@ class TunnelNode(Node):
         self.name = 'tunnel'
         self.logger = self.get_logger()
 
-        self._tunnel_state_publisher = self.create_publisher(TunnelState, 'tunnel_state', 10)
-
-        # self._joint_target_subscription = self.create_subscription(
-        #     TunnelState,
-        #     'tunnel_joint_target',
-        #     self._joint_target_callback,
-        #     10)
-        # self._joint_target_subscription  # prevent unused variable warning
-
         self._attached_timer_period = 1
         self._attached_timer = None
         self._latched_timer_period = 5
@@ -63,6 +55,15 @@ class TunnelNode(Node):
         self.logger.info('opening tunnel phidgets...')
         self.tunnel.open()
 
+        self._tunnel_state_publisher = self.create_publisher(TunnelState, 'tunnel_state')
+
+        # self._joint_target_subscription = self.create_subscription(
+        #     TunnelState,
+        #     'tunnel_joint_target',
+        #     self._joint_target_callback,
+        #     10)
+        # self._joint_target_subscription  # prevent unused variable warning
+
     def _on_attach_handler(self, handle):
         self.tunnel._on_attach_handler(handle)
         if self._attached_timer is None:
@@ -70,6 +71,7 @@ class TunnelNode(Node):
 
     def _attached_timer_callback(self):
         self._attached_timer.cancel()
+        self.destroy_timer(self._attached_timer)
         self._attached_timer = None
         if self.tunnel.is_attached():
             self.logger.info('tunnel is attached!')
@@ -116,10 +118,13 @@ class TunnelNode(Node):
         for name, latch in self.tunnel.latches.items():
             if latch.stepper_joint.stepper.is_moving():
                 return
-        self._latched_timer = self.create_timer(self._latched_timer_period, self._latched_timer_callback)
+        if self._latched_timer is None:
+            self._latched_timer = threading.Timer(self._latched_timer_period, self._latched_timer_callback)
+            self._latched_timer.start()
+        self.logger.info('latched!')
 
     def _latched_timer_callback(self):
-        self._latched_timer.cancel()
+        self.logger.info('latched_timer_callback')
         self._latched_timer = None
         self.tunnel.set_stepper_on_stopped_handlers(self._unlatched_handler)
         self.tunnel.unlatch_all()
