@@ -164,7 +164,10 @@ def main(args=None):
 
     tunnel_node = TunnelNode()
 
-    rclpy.spin(tunnel_node)
+    try:
+        rclpy.spin(tunnel_node)
+    except KeyboardInterrupt:
+        pass
 
     tunnel_node.unlatch_all()
     while tunnel_node.latched:
