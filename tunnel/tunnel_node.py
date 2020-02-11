@@ -87,7 +87,7 @@ class TunnelNode(Node):
         if not self.tunnel.all_latches_homed:
             return
         tunnel_state = TunnelState()
-        tunnel_state.datetime = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        tunnel_state.datetime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         now_frac, now_whole = math.modf(time.time())
         tunnel_state.nanosec = int(now_frac * 1e9)
         tunnel_state.load_cell_voltage_ratio = self.tunnel.voltage_ratio_input.get_voltage_ratio()
