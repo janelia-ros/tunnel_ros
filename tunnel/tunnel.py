@@ -27,6 +27,7 @@
 
 import Phidget22.Devices.VoltageRatioInput
 from phidgets_python_api.voltage_ratio_input import VoltageRatioInput, VoltageRatioInputInfo
+from phidgets_python_api.digital_output import DigitalOutput, DigitalOutputInfo
 
 from .latch import Latch, LatchInfo
 
@@ -50,9 +51,17 @@ class TunnelInfo():
         self.latches_info['left'].stepper_joint_info.limit_switch_info.phidget_info.label = 'tunnel_0'
         self.latches_info['left'].stepper_joint_info.stepper_info.invert_direction = False
 
-        self.voltage_ratio_input_info = VoltageRatioInputInfo()
-        self.voltage_ratio_input_info.bridge_gain = Phidget22.Devices.VoltageRatioInput.BridgeGain.BRIDGE_GAIN_64
-        self.voltage_ratio_input_info.voltage_ratio_change_trigger = 0.0
+        self.load_cell_info = VoltageRatioInputInfo()
+        self.load_cell_info.phidget_info.hub_port = 0
+        self.load_cell_info.phidget_info.label = 'tunnel_1'
+        self.load_cell_info.bridge_gain = Phidget22.Devices.VoltageRatioInput.BridgeGain.BRIDGE_GAIN_64
+        self.load_cell_info.voltage_ratio_change_trigger = 0.0
+
+        self.start_trial_trigger_info = DigitalOutputInfo()
+        self.start_trial_trigger_info.phidget_info.hub_port = 4
+        self.start_trial_trigger_info.phidget_info.label = 'tunnel_1'
+        self.start_trial_trigger_activated_duty_cycle = 0.5
+        self.start_trial_trigger_deactivated_duty_cycle = 0.0
 
 
 class Tunnel():
@@ -67,38 +76,49 @@ class Tunnel():
                                        self.name + '_' + name + "_latch",
                                        self.logger)
 
-        self.voltage_ratio_input = VoltageRatioInput(self.tunnel_info.voltage_ratio_input_info,
-                                                     self.name + '_load_cell',
-                                                     self.logger)
+        self.load_cell = VoltageRatioInput(self.tunnel_info.load_cell_info,
+                                           self.name + '_load_cell',
+                                           self.logger)
+
+        self.start_trial_trigger = DigitalOutput(self.tunnel_info.start_trial_trigger_info,
+                                                 self.name + '_start_trial_trigger',
+                                                 self.logger)
 
     def open(self):
         for name, latch in self.latches.items():
             latch.open()
-        self.voltage_ratio_input.open()
+        self.load_cell.open()
+        self.start_trial_trigger.open()
 
     def close(self):
         for name, latch in self.latches.items():
             latch.close()
-        self.voltage_ratio_input.close()
+        self.load_cell.close()
+        self.start_trial_trigger.close()
 
     def set_on_attach_handler(self, on_attach_handler):
         for name, latch in self.latches.items():
             latch.set_on_attach_handler(on_attach_handler)
-        self.voltage_ratio_input.set_on_attach_handler(on_attach_handler)
+        self.load_cell.set_on_attach_handler(on_attach_handler)
+        self.start_trial_trigger.set_on_attach_handler(on_attach_handler)
 
     def _on_attach_handler(self, handle):
         for name, latch in self.latches.items():
             if latch.has_handle(handle):
                 latch._on_attach_handler(handle)
                 return
-        if self.voltage_ratio_input.has_handle(handle):
-            self.voltage_ratio_input._on_attach_handler(handle)
+        if self.load_cell.has_handle(handle):
+            self.load_cell._on_attach_handler(handle)
+        if self.start_trial_trigger.has_handle(handle):
+            self.start_trial_trigger._on_attach_handler(handle)
 
     def is_attached(self):
         for name, latch in self.latches.items():
             if not latch.is_attached():
                 return False
-        if not self.voltage_ratio_input.is_attached():
+        if not self.load_cell.is_attached():
+            return False
+        if not self.start_trial_trigger.is_attached():
             return False
         return True
 
@@ -156,6 +176,14 @@ class Tunnel():
                 break
         return all_active
 
+    def any_limit_switches_active(self):
+        any_active = False
+        for name, latch in self.latches.items():
+            if latch.stepper_joint.limit_switch.is_active():
+                any_active = True
+                break
+        return any_active
+
     def all_steppers_in_step_control_mode(self):
         all_in_step_control_mode = True
         for name, latch in self.latches.items():
@@ -171,3 +199,11 @@ class Tunnel():
     def unlatch_all(self):
         for name, latch in self.latches.items():
             latch.unlatch()
+
+    def activate_start_trial_trigger(self):
+        duty_cycle = self.tunnel_info.start_trial_trigger_activated_duty_cycle
+        self.start_trial_trigger.set_duty_cycle(duty_cycle)
+
+    def deactivate_start_trial_trigger(self):
+        duty_cycle = self.tunnel_info.start_trial_trigger_deactivated_duty_cycle
+        self.start_trial_trigger.set_duty_cycle(duty_cycle)

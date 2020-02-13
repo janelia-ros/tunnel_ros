@@ -50,8 +50,10 @@ class TunnelNode(Node):
         self._latched_timer_period = 5
         self._latched_timer = None
 
-        self.latch_mode = False
+        self.latch_mode = True
+        self.require_both_head_bar_sensors = True
         self.latched = False
+        self.latch_disabled = False
 
         self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
         self.tunnel.set_on_attach_handler(self._on_attach_handler)
@@ -80,7 +82,7 @@ class TunnelNode(Node):
             self.tunnel.set_stepper_on_change_handlers_to_disabled()
             self.tunnel.set_stepper_on_homed_handlers(self._homed_handler)
             self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
-            self.tunnel.voltage_ratio_input.set_on_voltage_ratio_change_handler(self._publish_tunnel_state_handler)
+            self.tunnel.load_cell.set_on_voltage_ratio_change_handler(self._voltage_ratio_change_handler)
             self.tunnel.home_latches()
 
     def _publish_tunnel_state_handler(self, handle, value):
@@ -90,12 +92,15 @@ class TunnelNode(Node):
         tunnel_state.datetime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
         now_frac, now_whole = math.modf(time.time())
         tunnel_state.nanosec = int(now_frac * 1e9)
-        tunnel_state.load_cell_voltage_ratio = self.tunnel.voltage_ratio_input.get_voltage_ratio()
+        tunnel_state.load_cell_voltage_ratio = self.tunnel.load_cell.get_voltage_ratio()
         tunnel_state.right_head_bar_sensor_active = self.tunnel.latches['right'].stepper_joint.limit_switch.is_active()
         tunnel_state.left_head_bar_sensor_active = self.tunnel.latches['left'].stepper_joint.limit_switch.is_active()
         tunnel_state.right_latch_position = self.tunnel.latches['right'].stepper_joint.stepper.get_position()
         tunnel_state.left_latch_position = self.tunnel.latches['left'].stepper_joint.stepper.get_position()
         self._tunnel_state_publisher.publish(tunnel_state)
+
+    def _voltage_ratio_change_handler(self, handle, value):
+        self._publish_tunnel_state_handler(handle, value)
 
     def _homed_handler(self, handle):
         if not self.tunnel.all_latches_homed():
@@ -106,9 +111,14 @@ class TunnelNode(Node):
 
     def _trigger_latch_handler(self, handle, state):
         self._publish_tunnel_state_handler(handle, state)
-        if not self.tunnel.all_limit_switches_active():
+        if not self.tunnel.any_limit_switches_active():
+            self.tunnel.deactivate_start_trial_trigger()
             return
-        self.latch_all()
+        if self.require_both_head_bar_sensors and not self.tunnel.all_limit_switches_active():
+            return
+        self.tunnel.activate_start_trial_trigger()
+        if self.latch_mode:
+            self.latch_all()
 
     def _latched_handler(self, handle):
         if self.tunnel.any_latches_moving():
@@ -127,19 +137,25 @@ class TunnelNode(Node):
         if self.tunnel.any_latches_moving():
             return
         self.latched = False
-        self.tunnel.set_stepper_on_stopped_handlers_to_disabled()
-        self.tunnel.set_limit_switch_handlers(self._trigger_latch_handler)
+        self.latch_disabled = False
 
     def latch_all(self):
+        if self.latch_disabled:
+            return
         if not self.tunnel.all_steppers_in_step_control_mode():
             return
         self.tunnel.set_stepper_on_stopped_handlers(self._latched_handler)
-        self.tunnel.set_limit_switch_handlers(self._publish_tunnel_state_handler)
+        self.tunnel.latch_disabled = True
         self.tunnel.latch_all()
 
     def unlatch_all(self):
         self.tunnel.set_stepper_on_stopped_handlers(self._unlatched_handler)
         self.tunnel.unlatch_all()
+
+    def shutdown(self):
+        pass
+        # self.unlatch_all()
+        # self.tunnel.deactivate_start_trial_trigger()
 
     # def _tunnel_control_callback(self, msg):
     #     if len(msg.name) == len(msg.velocity) == len(msg.position):
@@ -169,9 +185,12 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
 
-    tunnel_node.unlatch_all()
-    while tunnel_node.latched:
-        time.sleep(1)
+    tunnel_node.shutdown()
+    # timeout_limit = 3
+    # timeout_count = 0
+    # while tunnel_node.latched and timeout_count < timeout_limit:
+    #     time.sleep(1)
+    #     timeout_count += 1
     tunnel_node.destroy_node()
     rclpy.shutdown()
 
