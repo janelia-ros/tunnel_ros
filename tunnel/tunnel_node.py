@@ -55,7 +55,7 @@ class TunnelNode(Node):
         self.latched = False
         self.latch_disabled = False
 
-        self.tunnel = Tunnel(self.tunnel_info, self.name, self.logger)
+        self.tunnel = Tunnel(self.name, self.logger, self.tunnel_info)
         self.tunnel.set_on_attach_handler(self._on_attach_handler)
         self.logger.info('opening tunnel phidgets...')
         self.tunnel.open()

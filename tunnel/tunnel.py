@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import Phidget22.Devices.VoltageRatioInput
+from phidgets_python_api.phidget import PhidgetComposite
 from phidgets_python_api.voltage_ratio_input import VoltageRatioInput, VoltageRatioInputInfo
 from phidgets_python_api.digital_output import DigitalOutput, DigitalOutputInfo
 
@@ -64,63 +65,29 @@ class TunnelInfo():
         self.start_trial_trigger_deactivated_duty_cycle = 0.0
 
 
-class Tunnel():
-    def __init__(self, tunnel_info, name, logger):
+class Tunnel(PhidgetComposite):
+    def __init__(self, name, logger, tunnel_info):
+        super().__init__(name, logger)
         self.tunnel_info = tunnel_info
-        self.name = name
-        self.logger = logger
 
         self.latches = {}
         for name, info in self.tunnel_info.latches_info.items():
-            self.latches[name] = Latch(info,
-                                       self.name + '_' + name + "_latch",
-                                       self.logger)
+            latch_name = self.name + '_' + name + "_latch"
+            latch = Latch(latch_name, self.logger, info)
+            self.add(latch)
+            self.latches[name] = latch
 
-        self.load_cell = VoltageRatioInput(self.tunnel_info.load_cell_info,
-                                           self.name + '_load_cell',
-                                           self.logger)
+        load_cell_name = self.name + '_load_cell'
+        self.load_cell = VoltageRatioInput(load_cell_name,
+                                           self.logger,
+                                           self.tunnel_info.load_cell_info)
+        self.add(self.load_cell)
 
-        self.start_trial_trigger = DigitalOutput(self.tunnel_info.start_trial_trigger_info,
-                                                 self.name + '_start_trial_trigger',
-                                                 self.logger)
-
-    def open(self):
-        for name, latch in self.latches.items():
-            latch.open()
-        self.load_cell.open()
-        self.start_trial_trigger.open()
-
-    def close(self):
-        for name, latch in self.latches.items():
-            latch.close()
-        self.load_cell.close()
-        self.start_trial_trigger.close()
-
-    def set_on_attach_handler(self, on_attach_handler):
-        for name, latch in self.latches.items():
-            latch.set_on_attach_handler(on_attach_handler)
-        self.load_cell.set_on_attach_handler(on_attach_handler)
-        self.start_trial_trigger.set_on_attach_handler(on_attach_handler)
-
-    def _on_attach_handler(self, handle):
-        for name, latch in self.latches.items():
-            if latch.has_handle(handle):
-                latch._on_attach_handler(handle)
-                return
-        if self.load_cell.has_handle(handle):
-            self.load_cell._on_attach_handler(handle)
-        if self.start_trial_trigger.has_handle(handle):
-            self.start_trial_trigger._on_attach_handler(handle)
-
-    def is_attached(self):
-        for name, latch in self.latches.items():
-            if not latch.is_attached():
-                return False
-        if not self.load_cell.is_attached():
-            return False
-        if not self.start_trial_trigger.is_attached():
-            return False
-        return True
+        start_trial_trigger_name = self.name + '_start_trial_trigger'
+        self.start_trial_trigger = DigitalOutput(start_trial_trigger_name,
+                                                 self.logger,
+                                                 self.tunnel_info.start_trial_trigger_info)
+        self.add(self.start_trial_trigger)
 
     def set_stepper_on_change_handlers(self, stepper_on_change_handler):
         for name, latch in self.latches.items():

@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from phidgets_python_api.phidget import PhidgetComposite
 from phidgets_python_api.stepper_joint import StepperJoint, StepperJointInfo
 from phidgets_python_api.digital_input import DigitalInputInfo
 
@@ -42,31 +43,14 @@ class LatchInfo():
         self.find_latch_position_target_position = 10000
         self.latch_position = 1300
 
-class Latch():
-    def __init__(self, latch_info, name, logger):
+class Latch(PhidgetComposite):
+    def __init__(self, name, logger, latch_info):
+        super().__init__(name, logger)
         self.latch_info = latch_info
-        self.name = name
-        self.logger = logger
 
-        self.stepper_joint = StepperJoint(self.latch_info.stepper_joint_info, self.name, self.logger)
-
-    def open(self):
-        self.stepper_joint.open()
-
-    def close(self):
-        self.stepper_joint.close()
-
-    def has_handle(self, handle):
-        return self.stepper_joint.has_handle(handle)
-
-    def set_on_attach_handler(self, on_attach_handler):
-        self.stepper_joint.set_on_attach_handler(on_attach_handler)
-
-    def _on_attach_handler(self, handle):
-        self.stepper_joint._on_attach_handler(handle)
-
-    def is_attached(self):
-        return self.stepper_joint.is_attached()
+        stepper_joint_name = self.name + '_stepper_joint'
+        self.stepper_joint = StepperJoint(stepper_joint_name, self.logger, self.latch_info.stepper_joint_info)
+        self.add(self.stepper_joint)
 
     def latch(self):
         self.stepper_joint.stepper.set_target_position(self.latch_info.latch_position)
