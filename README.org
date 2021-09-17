@@ -1,6 +1,6 @@
 #+TITLE: Tunnel ROS Interface
 #+AUTHOR: Peter Polidoro
-#+EMAIL: peterpolidoro@gmail.com
+#+EMAIL: peter@polidoro.io
 
 * Library Information
   - Name :: Tunnel ROS Interface
@@ -8,7 +8,7 @@
   - License :: BSD
   - URL :: https://github.com/janelia-ros/tunnel_ros
   - Author :: Peter Polidoro
-  - Email :: peterpolidoro@gmail.com
+  - Email :: peter@polidoro.io
 
 * Description
 

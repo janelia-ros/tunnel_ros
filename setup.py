@@ -17,9 +17,9 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     author='Peter Polidoro',
-    author_email='peterpolidoro@gmail.com',
+    author_email='peter@polidoro.io',
     maintainer='Peter Polidoro',
-    maintainer_email='peterpolidoro@gmail.com',
+    maintainer_email='peter@polidoro.io',
     keywords=['ROS'],
     classifiers=[
         'Intended Audience :: Developers',

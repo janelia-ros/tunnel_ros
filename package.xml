@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>Tunnel ROS interface</description>
 
-  <maintainer email="peterpolidoro@gmail.com">Peter Polidoro</maintainer>
+  <maintainer email="peter@polidoro.io">Peter Polidoro</maintainer>
 
   <license>BSD</license>
 
